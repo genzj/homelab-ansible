@@ -1,0 +1,190 @@
+---
+# docker-container-restart: (re)start a container whatever its current state.
+#
+#   running / restarting -> docker restart
+#   paused               -> docker unpause, then docker restart
+#   created / exited     -> docker start
+#   dead / removing      -> fail (docker cannot start these; recreate instead)
+#
+# Then waits until the container is running and, if it has a healthcheck,
+# healthy, and checks it stays up (no crash loop) for restart_stable_seconds.
+#
+# Required : restart_container  container name or ID  (e.g. "web")
+# Optional : restart_stop_timeout (10), restart_wait_seconds (60),
+#            restart_require_healthy (true), restart_stable_seconds (5)
+#
+# Check mode (--check) inspects the container and prints the planned action.
+# Uses `raw` only, so it works on hosts without Python (e.g. Flatcar).
+# Targets: docker_hosts. Use Semaphore Limit (or `target`) to pick the host
+# that runs the container.
+
+- name: Restart a docker container
+  hosts: "{{ target | default('docker_hosts') }}"
+  gather_facts: false
+  become: false   # never escalate; `ansible` must be in the `docker` group
+
+  vars:
+    restart_stop_timeout: 10       # seconds to wait for a graceful stop before SIGKILL
+    restart_wait_seconds: 60       # max seconds to wait for running/healthy; 0 = don't wait
+    restart_require_healthy: true  # if the container has a healthcheck, wait for "healthy"
+    restart_stable_seconds: 5      # must stay up (no restart) this long after coming up; 0 = skip
+    restart_fields: [name, status, health, started_at, restart_count]
+    # One marker-prefixed line, so stray stderr lines (e.g. locale warnings) are ignored.
+    restart_inspect_format: !unsafe >-
+      STATE|{{.Name}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.State.StartedAt}}|{{.RestartCount}}
+    restart_inspect_cmd: >-
+      docker inspect --type container --format {{ restart_inspect_format | quote }}
+      {{ restart_container | string | trim | quote }}
+
+  tasks:
+    - name: Validate parameters
+      ansible.builtin.assert:
+        that:
+          - restart_container is defined
+          - restart_container | string | trim | length > 0
+          - restart_stop_timeout | int >= 0
+          - restart_wait_seconds | int >= 0
+          - restart_stable_seconds | int >= 0
+        fail_msg: >-
+          restart_container is required; timeouts must be >= 0.
+          Example: {"restart_container": "web"}
+        quiet: true
+
+    - name: Inspect container
+      ansible.builtin.raw: "{{ restart_inspect_cmd }}"
+      register: restart_inspect
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: Parse current state
+      ansible.builtin.set_fact:
+        restart_before: "{{ dict(restart_fields | zip(state_line.split('|')[1:])) }}"
+        restart_name: "{{ state_line.split('|')[1] | regex_replace('^/', '') }}"
+      vars:
+        state_line: "{{ restart_inspect.stdout_lines | select('match', '^STATE\\|') | last | default('') }}"
+      when: state_line | length > 0
+
+    - name: Assert the container exists
+      ansible.builtin.assert:
+        that: restart_before is defined
+        fail_msg: >-
+          Container '{{ restart_container }}' not found on {{ inventory_hostname }}:
+          {{ restart_inspect.stdout | trim }}
+        quiet: true
+
+    - name: Choose action
+      ansible.builtin.set_fact:
+        restart_action: >-
+          {{ {'running': 'restart', 'restarting': 'restart', 'paused': 'unpause+restart',
+              'created': 'start', 'exited': 'start'}.get(restart_before.status, 'unsupported') }}
+
+    - name: Assert the state is restartable
+      ansible.builtin.assert:
+        that: restart_action != 'unsupported'
+        fail_msg: >-
+          Container {{ restart_name }} is '{{ restart_before.status }}'. Docker cannot
+          start containers in this state; remove and recreate it (e.g. docker compose up -d).
+        quiet: true
+
+    - name: Show plan
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Would' if ansible_check_mode else 'Will' }} {{ restart_action }}
+          {{ restart_name }} (currently {{ restart_before.status }},
+          health {{ restart_before.health }})
+
+    - name: Unpause container
+      ansible.builtin.raw: docker unpause {{ restart_container | string | trim | quote }}
+      when:
+        - restart_action == 'unpause+restart'
+        - not ansible_check_mode
+      changed_when: true
+
+    - name: Restart container
+      ansible.builtin.raw: >-
+        docker restart --time {{ restart_stop_timeout | int }}
+        {{ restart_container | string | trim | quote }}
+      when:
+        - restart_action in ['restart', 'unpause+restart']
+        - not ansible_check_mode
+      changed_when: true
+
+    - name: Start container
+      ansible.builtin.raw: docker start {{ restart_container | string | trim | quote }}
+      when:
+        - restart_action == 'start'
+        - not ansible_check_mode
+      changed_when: true
+
+    - name: Wait until running{{ ' and healthy' if restart_require_healthy | bool else '' }}
+      ansible.builtin.raw: "{{ restart_inspect_cmd }}"
+      register: restart_poll
+      changed_when: false
+      failed_when: false
+      retries: "{{ [((restart_wait_seconds | int) / 2) | round(0, 'ceil') | int, 1] | max }}"
+      delay: 2
+      until: >-
+        (poll_status == 'running' and (poll_health in ['none', 'healthy'] or not restart_require_healthy | bool))
+        or poll_status in ['dead', 'removing']
+      vars:
+        poll_fields: "{{ (restart_poll.stdout_lines | default([]) | select('match', '^STATE\\|') | last | default('|||||')).split('|') }}"
+        poll_status: "{{ poll_fields[2] }}"
+        poll_health: "{{ poll_fields[3] }}"
+      when:
+        - not ansible_check_mode
+        - restart_wait_seconds | int > 0
+
+    - name: Parse new state
+      ansible.builtin.set_fact:
+        restart_after: "{{ dict(restart_fields | zip(state_line.split('|')[1:])) }}"
+      vars:
+        state_line: "{{ restart_poll.stdout_lines | select('match', '^STATE\\|') | last | default('|||||') }}"
+      when: restart_poll is not skipped
+
+    - name: Assert the container is up
+      ansible.builtin.assert:
+        that:
+          - restart_after.status == 'running'
+          - restart_after.health in ['none', 'healthy'] or not restart_require_healthy | bool
+        fail_msg: >-
+          {{ restart_name }} did not come up within {{ restart_wait_seconds }}s:
+          status={{ restart_after.status }} health={{ restart_after.health }}
+          restarts={{ restart_after.restart_count }}. Check `docker logs` for the container.
+        quiet: true
+      when: restart_after is defined
+
+    - name: Check it stays up (seconds) {{ restart_stable_seconds }}
+      ansible.builtin.raw: sleep {{ restart_stable_seconds | int }}; {{ restart_inspect_cmd }}
+      register: restart_stable
+      changed_when: false
+      failed_when: false
+      when:
+        - restart_after is defined
+        - restart_stable_seconds | int > 0
+
+    - name: Assert it did not crash or restart
+      ansible.builtin.assert:
+        that:
+          - stable.status == 'running'
+          - stable.started_at == restart_after.started_at
+        fail_msg: >-
+          {{ restart_name }} came up but did not stay up for {{ restart_stable_seconds }}s
+          (status={{ stable.status }}, restarts {{ restart_after.restart_count }} -> {{ stable.restart_count }}).
+          It's probably crash-looping; check `docker logs` for the container.
+        quiet: true
+      vars:
+        state_line: "{{ restart_stable.stdout_lines | select('match', '^STATE\\|') | last | default('|||||') }}"
+        stable: "{{ dict(restart_fields | zip(state_line.split('|')[1:])) }}"
+      when: restart_stable is not skipped
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          container: "{{ restart_name }}"
+          action: "{{ restart_action }}"
+          before: "{{ restart_before.status }} (health {{ restart_before.health }})"
+          after: >-
+            {{ (restart_after.status ~ ' (health ' ~ restart_after.health ~ '), started ' ~ restart_after.started_at)
+               if restart_after is defined else ('not checked' if not ansible_check_mode else 'check mode') }}

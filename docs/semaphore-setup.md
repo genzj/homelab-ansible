@@ -56,7 +56,7 @@ Groups used by playbooks in this repo:
 
 | Group | Used by |
 |---|---|
-| `docker_hosts` | `docker-ps`, `docker-prune`, `docker-container-exec` |
+| `docker_hosts` | `docker-ps`, `docker-prune`, `docker-container-exec`, `docker-container-restart` |
 | *(all)* | `healthcheck` |
 
 ## 4. Environment
@@ -83,5 +83,6 @@ repo root:
 | Docker prune (dry run) | `playbooks/docker-prune/playbook.yml` | `["--check"]` |
 | Docker prune | `playbooks/docker-prune/playbook.yml` | |
 | Docker exec | `playbooks/docker-container-exec/playbook.yml` | (survey vars, set Limit) |
+| Docker restart | `playbooks/docker-container-restart/playbook.yml` | (survey vars, set Limit) |
 
 Run **Docker ps** first: it validates the key, the proxy, and docker group access.

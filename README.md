@@ -19,6 +19,7 @@ playbooks/
   docker-ps/                 # smoke test: SSH + docker access + docker ps
   docker-prune/              # docker system prune (opt-in flags)
   docker-container-exec/     # docker exec a command in a container
+  docker-container-restart/  # restart a container from any state
 docs/
   adding-a-playbook.md
   semaphore-setup.md
