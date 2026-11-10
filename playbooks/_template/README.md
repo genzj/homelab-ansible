@@ -12,13 +12,29 @@
 
 ## Variables
 
-| Name           | Default | Description                    |
-|----------------|---------|--------------------------------|
-| `target`       | `all`   | Host pattern / inventory group |
-| `example_flag` | `false` | Enables the destructive step   |
+| Name            | Required | Default | Description                    |
+|-----------------|----------|---------|--------------------------------|
+| `target`        | no       | `all`   | Host pattern / inventory group |
+| `example_name`  | **yes**  | –       | <what it is>                   |
+| `example_count` | no       | `3`     | <what it is>                   |
+| `example_flag`  | no       | `false` | Enables the destructive step   |
+
+Example extra vars:
+
+```json
+{"example_name": "web", "example_count": 5}
+```
+
+## Survey variables
+
+| Name            | Title           | Type                  | Required | Default |
+|-----------------|-----------------|-----------------------|----------|---------|
+| `example_name`  | Example name    | String                | yes      |         |
+| `example_count` | Example count   | Integer               | no       | `3`     |
+| `example_flag`  | Run destructive | Enum (`true`/`false`) | no       | `false` |
 
 ## Semaphore template
 
 - Playbook filename: `playbooks/<playbook-name>/playbook.yml`
 - Inventory: any inventory that contains the target group
-- Extra variables (optional): `{"target": "docker_hosts"}`
+- Survey variables: as listed above

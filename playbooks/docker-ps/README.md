@@ -14,12 +14,24 @@ wiring up a new Semaphore inventory or SSH key.
 
 ## Variables
 
-| Name            | Default        | Description                                        |
-|-----------------|----------------|----------------------------------------------------|
-| `target`        | `docker_hosts` | Host pattern / inventory group                     |
-| `docker_ps_all` | `false`        | Include stopped containers                         |
+| Name            | Required | Default        | Description                    |
+|-----------------|----------|----------------|--------------------------------|
+| `target`        | no       | `docker_hosts` | Host pattern / inventory group |
+| `docker_ps_all` | no       | `false`        | Include stopped containers     |
+
+No required variables. Example extra vars:
+
+```json
+{"docker_ps_all": true}
+```
+
+## Survey variables
+
+| Name            | Title                      | Type                  | Required | Default |
+|-----------------|----------------------------|-----------------------|----------|---------|
+| `docker_ps_all` | Include stopped containers | Enum (`true`/`false`) | no       | `false` |
 
 ## Semaphore template
 
 - Playbook filename: `playbooks/docker-ps/playbook.yml`
-- Extra variables (optional): `{"docker_ps_all": true}`
+- Survey variables: as listed above

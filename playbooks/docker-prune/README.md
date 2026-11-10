@@ -14,12 +14,26 @@ containers, unused networks, dangling images and build cache older than
 
 ## Variables
 
-| Name               | Default        | Description |
-|--------------------|----------------|-------------|
-| `target`           | `docker_hosts` | Host pattern / inventory group |
-| `prune_all_images` | `false`        | Remove all unused images, not only dangling ones (`--all`) |
-| `prune_volumes`    | `false`        | Remove unused volumes (`--volumes`). **Data loss risk.** Disables the `until` filter (docker limitation) |
-| `prune_until`      | `24h`          | Only prune objects older than this; `""` disables the filter |
+| Name               | Required | Default        | Description |
+|--------------------|----------|----------------|-------------|
+| `target`           | no       | `docker_hosts` | Host pattern / inventory group |
+| `prune_all_images` | no       | `false`        | Remove all unused images, not only dangling ones (`--all`) |
+| `prune_volumes`    | no       | `false`        | Remove unused volumes (`--volumes`). **Data loss risk.** Disables the `until` filter (docker limitation) |
+| `prune_until`      | no       | `24h`          | Only prune objects older than this; `""` disables the filter |
+
+No required variables. Example extra vars:
+
+```json
+{"prune_all_images": true, "prune_until": "168h"}
+```
+
+## Survey variables
+
+| Name               | Title                   | Type                  | Required | Default |
+|--------------------|-------------------------|-----------------------|----------|---------|
+| `prune_all_images` | Prune all unused images | Enum (`true`/`false`) | no       | `false` |
+| `prune_volumes`    | Prune volumes (DANGER)  | Enum (`true`/`false`) | no       | `false` |
+| `prune_until`      | Older than (e.g. `24h`) | String                | no       | `24h`   |
 
 ## Semaphore template
 

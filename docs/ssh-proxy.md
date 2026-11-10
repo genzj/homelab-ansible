@@ -19,7 +19,7 @@ Host jumper.example.com
     User proxy
     ProxyCommand cloudflared access ssh --hostname %h
 
-Host *.example.lan 10.0.0.*
+Host *.example.lan 192.0.2.*
     ProxyJump jumper.example.com
 ```
 

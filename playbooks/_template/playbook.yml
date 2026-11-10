@@ -1,37 +1,55 @@
 ---
 # <Playbook title>
 #
-# Purpose : <one line describing what this operation does>
-# Targets : <default group>, override with extra var `target` or Semaphore "Limit"
-# Vars    : see "vars" below; override in Semaphore template "Extra variables"
+# Purpose  : <one line describing what this operation does>
+# Targets  : <default group>, override with extra var `target` or Semaphore "Limit"
+# Required : example_name   (e.g. {"example_name": "web"})
+# Optional : example_count (default 3), example_flag (default false)
 #
 # Copy this folder to playbooks/<your-playbook-name>/ and edit.
-# See docs/adding-a-playbook.md for conventions.
+# See docs/adding-a-playbook.md for conventions and survey-variable practices.
 
 - name: <Playbook title>
   hosts: "{{ target | default('all') }}"
   gather_facts: false
   become: false           # never change: `ansible` has no sudo (see docs)
 
+  # Optional parameters with defaults. Required ones are NOT defined here.
+  # They're validated in the first task.
   vars:
+    example_count: 3      # example integer parameter
     example_flag: false   # destructive behaviour must be opt-in
 
-  # Target without Python (e.g. Flatcar)? Use ansible.builtin.raw instead of
-  # command/shell, keep gather_facts: false, and add check_mode: false to
-  # read-only raw tasks. See playbooks/docker-ps/playbook.yml.
+  # raw works on any host, including ones without Python (e.g. Flatcar).
+  # If every target has Python you may use command/shell/other modules.
   tasks:
+    - name: Validate parameters
+      ansible.builtin.assert:
+        that:
+          - example_name is defined
+          - example_name | string | length > 0
+          - example_count | int > 0
+        fail_msg: >-
+          example_name is required and example_count must be > 0.
+          Example: {"example_name": "web", "example_count": 5}
+        quiet: true
+
     - name: Read-only example
-      ansible.builtin.command: uname -a
+      ansible.builtin.raw: uname -a
       register: uname_out
       changed_when: false   # read-only commands never report "changed"
+      check_mode: false     # raw would otherwise be skipped in --check
 
     - name: Show result
       ansible.builtin.debug:
-        var: uname_out.stdout
+        msg:
+          name: "{{ example_name }}"
+          count: "{{ example_count | int }}"
+          uname: "{{ uname_out.stdout | trim }}"
 
     - name: Destructive example (skipped in check mode, gated by a var)
-      ansible.builtin.command: /bin/true
+      ansible.builtin.raw: /bin/true
       when:
-        - example_flag | bool
+        - example_flag | bool   # always cast survey values
         - not ansible_check_mode
       changed_when: true

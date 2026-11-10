@@ -13,10 +13,22 @@ usage, plus a warning for mounts above `disk_warn_percent`.
 
 ## Variables
 
-| Name                | Default | Description                       |
-|---------------------|---------|-----------------------------------|
-| `target`            | `all`   | Host pattern / inventory group    |
-| `disk_warn_percent` | `85`    | Usage % at which a mount is flagged |
+| Name                | Required | Default | Description                         |
+|---------------------|----------|---------|-------------------------------------|
+| `target`            | no       | `all`   | Host pattern / inventory group      |
+| `disk_warn_percent` | no       | `85`    | Usage % at which a mount is flagged |
+
+No required variables. Example extra vars:
+
+```json
+{"target": "docker_hosts", "disk_warn_percent": 90}
+```
+
+## Survey variables
+
+| Name                | Title                | Type    | Required | Default |
+|---------------------|----------------------|---------|----------|---------|
+| `disk_warn_percent` | Disk warn threshold % | Integer | no       | `85`    |
 
 ## Semaphore template
 
