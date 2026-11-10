@@ -1,0 +1,64 @@
+---
+# docker-prune: reclaim disk space by removing unused docker data.
+# Default: stopped containers, unused networks, dangling images and build
+# cache older than `prune_until`. Volumes and all unused images are opt-in.
+# Check mode (--check) reports usage without pruning.
+# Uses `raw` only, so it works on hosts without Python (e.g. Flatcar).
+# Targets: docker_hosts (override with `target` or Semaphore Limit)
+
+- name: Prune unused docker data
+  hosts: "{{ target | default('docker_hosts') }}"
+  gather_facts: false
+  become: false   # never escalate; `ansible` must be in the `docker` group
+
+  vars:
+    prune_all_images: false   # also remove unused (not just dangling) images
+    prune_volumes: false      # also remove unused volumes  -- DATA LOSS RISK
+    prune_until: 24h          # only prune objects older than this ("" = no filter)
+
+  tasks:
+    - name: Disk usage before
+      ansible.builtin.raw: docker system df
+      register: df_before
+      changed_when: false
+      check_mode: false
+
+    - name: Show disk usage before
+      ansible.builtin.debug:
+        var: df_before.stdout_lines
+
+    # docker rejects `--filter until` together with `--volumes`, so the age
+    # filter is dropped when volumes are pruned.
+    - name: Build prune command
+      ansible.builtin.set_fact:
+        prune_argv: >-
+          {{ ['docker', 'system', 'prune', '--force']
+             + (['--all'] if prune_all_images | bool else [])
+             + (['--volumes'] if prune_volumes | bool else [])
+             + (['--filter', 'until=' ~ prune_until] if (prune_until | string | length > 0 and not prune_volumes | bool) else []) }}
+
+    - name: Show prune command
+      ansible.builtin.debug:
+        msg: "{{ 'Would run' if ansible_check_mode else 'Running' }}: {{ prune_argv | join(' ') }}"
+
+    - name: Prune
+      ansible.builtin.raw: "{{ prune_argv | map('quote') | join(' ') }}"
+      register: prune_out
+      when: not ansible_check_mode
+      changed_when: "'Total reclaimed space: 0B' not in prune_out.stdout"
+
+    - name: Show prune result
+      ansible.builtin.debug:
+        var: prune_out.stdout_lines
+      when: not ansible_check_mode
+
+    - name: Disk usage after
+      ansible.builtin.raw: docker system df
+      register: df_after
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Show disk usage after
+      ansible.builtin.debug:
+        var: df_after.stdout_lines
+      when: not ansible_check_mode

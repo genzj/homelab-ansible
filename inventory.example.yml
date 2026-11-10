@@ -1,0 +1,19 @@
+---
+# Example inventory. Real inventories live in Semaphore-UI (Inventory ->
+# Static YAML) or in the git-ignored local/ directory for testing.
+# Group names used by the playbooks:
+#   docker_hosts  - hosts running the Docker engine
+all:
+  vars:
+    ansible_user: ansible
+    # Only needed when the runner cannot reach the hosts directly.
+    # See docs/ssh-proxy.md.
+    # ansible_ssh_common_args: >-
+    #   -o ProxyCommand="ssh -W %h:%p -q proxy@jumper.example.com"
+  children:
+    docker_hosts:
+      hosts:
+        docker1.example.lan:
+    # other_group:
+    #   hosts:
+    #     host2.example.lan:

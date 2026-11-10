@@ -1,0 +1,37 @@
+---
+# <Playbook title>
+#
+# Purpose : <one line describing what this operation does>
+# Targets : <default group>, override with extra var `target` or Semaphore "Limit"
+# Vars    : see "vars" below; override in Semaphore template "Extra variables"
+#
+# Copy this folder to playbooks/<your-playbook-name>/ and edit.
+# See docs/adding-a-playbook.md for conventions.
+
+- name: <Playbook title>
+  hosts: "{{ target | default('all') }}"
+  gather_facts: false
+  become: false           # never change: `ansible` has no sudo (see docs)
+
+  vars:
+    example_flag: false   # destructive behaviour must be opt-in
+
+  # Target without Python (e.g. Flatcar)? Use ansible.builtin.raw instead of
+  # command/shell, keep gather_facts: false, and add check_mode: false to
+  # read-only raw tasks. See playbooks/docker-ps/playbook.yml.
+  tasks:
+    - name: Read-only example
+      ansible.builtin.command: uname -a
+      register: uname_out
+      changed_when: false   # read-only commands never report "changed"
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: uname_out.stdout
+
+    - name: Destructive example (skipped in check mode, gated by a var)
+      ansible.builtin.command: /bin/true
+      when:
+        - example_flag | bool
+        - not ansible_check_mode
+      changed_when: true

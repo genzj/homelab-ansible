@@ -1,0 +1,9 @@
+---
+# Semaphore-UI installs collections listed here automatically before each run
+# (ansible-galaxy collection install -r collections/requirements.yml).
+# Current playbooks only use ansible.builtin. Add entries when needed, e.g.:
+#
+# collections:
+#   - name: community.docker
+#     version: ">=3.0.0"
+collections: []

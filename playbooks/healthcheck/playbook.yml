@@ -1,0 +1,57 @@
+---
+# Healthcheck: read-only connectivity and resource report.
+# Uses `raw` only, so it works on hosts without Python (e.g. Flatcar).
+# Targets: all (override with `target` or Semaphore Limit)
+
+- name: Host healthcheck
+  hosts: "{{ target | default('all') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    disk_warn_percent: 85
+
+  tasks:
+    - name: Get OS release
+      ansible.builtin.raw: . /etc/os-release && echo "$PRETTY_NAME"
+      register: os_out
+      changed_when: false
+      check_mode: false
+
+    - name: Get uptime and load
+      ansible.builtin.raw: uptime
+      register: uptime_out
+      changed_when: false
+      check_mode: false
+
+    - name: Get disk usage
+      ansible.builtin.raw: df -hP -x tmpfs -x devtmpfs -x overlay -x squashfs
+      register: df_out
+      changed_when: false
+      check_mode: false
+
+    - name: Get memory usage
+      ansible.builtin.raw: free -m
+      register: free_out
+      changed_when: false
+      check_mode: false
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          os: "{{ os_out.stdout | trim }}"
+          uptime: "{{ uptime_out.stdout | trim }}"
+          disk: "{{ df_out.stdout_lines }}"
+          memory: "{{ free_out.stdout_lines }}"
+
+    # df -P columns: Filesystem Size Used Avail Use% Mounted-on
+    - name: Warn on full mounts
+      ansible.builtin.debug:
+        msg: "WARNING: {{ cols[5] }} is {{ cols[4] }} full (threshold {{ disk_warn_percent }}%)"
+      loop: "{{ df_out.stdout_lines | select('search', '^/\\S+\\s.*\\s[0-9]+%\\s') | list }}"
+      loop_control:
+        label: "{{ item.split()[-1] }}"
+      vars:
+        cols: "{{ item.split() }}"
+      when: (cols[4] | replace('%', '') | int) >= (disk_warn_percent | int)

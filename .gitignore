@@ -1,0 +1,19 @@
+# Local-only files (real hostnames, test inventories, keys). Never commit.
+local/
+
+# Inventories are managed in Semaphore-UI
+inventory*
+hosts*
+!inventory.example.yml
+
+# Secrets
+.vault_pass*
+*.pem
+*.key
+
+# Tooling / runtime
+*.retry
+.venv/
+.ansible/
+__pycache__/
+.DS_Store

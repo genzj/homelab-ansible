@@ -1,0 +1,82 @@
+# homelab-ansible
+
+Ansible playbooks for homelab operations, run from
+[Semaphore-UI](https://semaphoreui.com/). Semaphore clones this repo. Each
+operation is a separate folder under `playbooks/`, and inventories are managed
+in Semaphore, not here.
+
+## Layout
+
+```
+ansible.cfg                  # repo-wide settings (remote_user=ansible, no inventory)
+collections/requirements.yml # collections; Semaphore installs these automatically
+roles/                       # shared roles (optional)
+lint-rules/                  # custom ansible-lint rules (no-become)
+inventory.example.yml        # example inventory shape (placeholder hosts only)
+playbooks/
+  _template/                 # copy this to create a new playbook
+  healthcheck/               # read-only host report
+  docker-ps/                 # smoke test: SSH + docker access + docker ps
+  docker-prune/              # docker system prune (opt-in flags)
+docs/
+  adding-a-playbook.md
+  semaphore-setup.md
+  ssh-proxy.md
+local/                       # git-ignored: your test inventories, real hostnames
+```
+
+## Prerequisites on managed hosts
+
+- A user named `ansible` that accepts the Semaphore/runner SSH key.
+- **No sudo.** `ansible` is an unprivileged user and cannot run sudo.
+  Playbooks never use `become` (enforced by config and lint, see
+  [adding-a-playbook.md](docs/adding-a-playbook.md#no-privilege-escalation)).
+  Grant access via group membership instead.
+- For docker playbooks: `ansible` in the `docker` group.
+- Python is **not** required by the bundled playbooks. They use
+  `ansible.builtin.raw`, so they also work on Python-less hosts such as Flatcar
+  Container Linux. Playbooks that use regular modules need Python 3 on the
+  target.
+
+## Run locally
+
+Real hostnames go in a **git-ignored** `local/` inventory only:
+
+```yaml
+# local/inventory.yml
+all:
+  children:
+    docker_hosts:
+      hosts:
+        docker1.example.lan:
+          # ansible_ssh_private_key_file: ~/.ssh/<ansible-user-key>
+```
+
+```sh
+# no global install needed
+uvx --from ansible-core ansible-playbook -i local/inventory.yml playbooks/docker-ps/playbook.yml
+uvx --from ansible-core ansible-playbook -i local/inventory.yml playbooks/docker-prune/playbook.yml --check
+```
+
+Ansible uses the system OpenSSH client, so any `ProxyCommand`/`ProxyJump` in
+your `~/.ssh/config` is used as-is. `remote_user = ansible` in `ansible.cfg`
+overrides any `User` set there. See [docs/ssh-proxy.md](docs/ssh-proxy.md).
+
+A `bash: warning: setlocale: LC_ALL ...` line in output is harmless. It comes
+from macOS forwarding `LC_*` over SSH to a host without that locale.
+
+## Lint
+
+```sh
+uvx yamllint .
+uvx --from ansible-lint ansible-lint
+```
+
+## More
+
+- [Adding a new playbook](docs/adding-a-playbook.md)
+- [Semaphore-UI setup](docs/semaphore-setup.md)
+- [SSH through a proxy / jump host](docs/ssh-proxy.md)
+
+> Never commit real hostnames, IPs, keys or inventories. Put them in `local/`
+> or in Semaphore.

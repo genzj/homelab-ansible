@@ -1,0 +1,35 @@
+---
+# docker-ps: smoke test for the docker host(s). Verifies SSH (through the
+# proxy if configured) and access to the Docker engine, then lists containers.
+# Uses `raw` only, so it works on hosts without Python (e.g. Flatcar).
+# Targets: docker_hosts (override with `target` or Semaphore Limit)
+
+- name: List docker containers
+  hosts: "{{ target | default('docker_hosts') }}"
+  gather_facts: false
+  become: false   # never escalate; `ansible` must be in the `docker` group
+
+  vars:
+    docker_ps_all: false   # include stopped containers
+
+  tasks:
+    - name: Get docker engine version
+      ansible.builtin.raw: docker version --format '{% raw %}{{.Server.Version}}{% endraw %}'
+      register: docker_version
+      changed_when: false
+      check_mode: false
+
+    - name: Run docker ps
+      ansible.builtin.raw: >-
+        docker ps {{ '--all' if docker_ps_all | bool else '' }}
+        --format 'table {% raw %}{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}{% endraw %}'
+      register: docker_ps
+      changed_when: false
+      check_mode: false
+
+    - name: Show containers
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          docker_version: "{{ docker_version.stdout | trim }}"
+          containers: "{{ docker_ps.stdout_lines }}"

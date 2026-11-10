@@ -1,0 +1,14 @@
+---
+profile: production
+exclude_paths:
+  - local/
+  - .ansible/
+  - .venv/
+  - inventory.example.yml
+# Custom rules (no-become). Default rules stay enabled.
+rulesdir:
+  - ./lint-rules
+use_default_rules: true
+# Profiles only run their own rules; custom rules must be enabled explicitly.
+enable_list:
+  - no-become
