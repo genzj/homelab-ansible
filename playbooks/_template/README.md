@@ -12,12 +12,12 @@
 
 ## Variables
 
-| Name            | Required | Default | Description                    |
-|-----------------|----------|---------|--------------------------------|
-| `target`        | no       | `all`   | Host pattern / inventory group |
-| `example_name`  | **yes**  | –       | <what it is>                   |
-| `example_count` | no       | `3`     | <what it is>                   |
-| `example_flag`  | no       | `false` | Enables the destructive step   |
+| Name            | Type           | Required | Default | Description                    |
+|-----------------|----------------|----------|---------|--------------------------------|
+| `target`        | string         | no       | `all`   | Host pattern / inventory group |
+| `example_name`  | string         | **yes**  | –       | <what it is>                   |
+| `example_count` | integer        | no       | `3`     | <what it is>                   |
+| `example_flag`  | boolean        | no       | `false` | Enables the destructive step   |
 
 Example extra vars:
 

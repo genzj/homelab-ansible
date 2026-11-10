@@ -13,10 +13,10 @@ usage, plus a warning for mounts above `disk_warn_percent`.
 
 ## Variables
 
-| Name                | Required | Default | Description                         |
-|---------------------|----------|---------|-------------------------------------|
-| `target`            | no       | `all`   | Host pattern / inventory group      |
-| `disk_warn_percent` | no       | `85`    | Usage % at which a mount is flagged |
+| Name                | Type           | Required | Default | Description                         |
+|---------------------|----------------|----------|---------|-------------------------------------|
+| `target`            | string         | no       | `all`   | Host pattern / inventory group      |
+| `disk_warn_percent` | integer        | no       | `85`    | Usage % at which a mount is flagged |
 
 No required variables. Example extra vars:
 

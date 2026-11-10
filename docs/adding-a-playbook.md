@@ -138,11 +138,11 @@ example for every required one:
 ```markdown
 ## Variables
 
-| Name             | Required | Default | Description                     |
-|------------------|----------|---------|---------------------------------|
-| `target`         | no       | `all`   | Host pattern / inventory group  |
-| `container_name` | **yes**  | –       | Container to restart            |
-| `restart_wait`   | no       | `10`    | Seconds to wait after restart   |
+| Name             | Type           | Required | Default | Description                     |
+|------------------|----------------|----------|---------|---------------------------------|
+| `target`         | string         | no       | `all`   | Host pattern / inventory group  |
+| `container_name` | string         | **yes**  | –       | Container to restart            |
+| `restart_wait`   | integer        | no       | `10`    | Seconds to wait after restart   |
 
 Example extra vars:
 
@@ -155,6 +155,21 @@ Example extra vars:
 | `container_name` | Container name    | String  | yes      |         |
 | `restart_wait`   | Wait (seconds)    | Integer | no       | `10`    |
 ```
+
+The **Type** column gives the value type the playbook expects. Use only
+these types. When you add the variable as a Survey Variable, pick the
+matching survey type:
+
+| Type      | Survey type           | Playbook handling |
+|-----------|-----------------------|-------------------|
+| `string`  | String                | `\| string \| trim` when validating |
+| `integer` | Integer               | always `\| int` |
+| `boolean` | Enum (`true`/`false`) | always `\| bool` |
+| `list`    | – (extra vars JSON only) | Surveys can't send lists. Pair it with a string form, e.g. `string \| list` |
+| `mapping` | String (JSON object)  | accept a mapping or parse a JSON string with `from_json` |
+| `secret`  | Secret                | a string; use `no_log: true` on tasks that use it |
+
+Write alternatives as `string \| list` when a variable accepts several types.
 
 The playbook header comment lists the required variables too, so they're
 visible to anyone reading the YAML. `playbooks/_template` has this structure

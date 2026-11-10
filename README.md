@@ -18,6 +18,7 @@ playbooks/
   healthcheck/               # read-only host report
   docker-ps/                 # smoke test: SSH + docker access + docker ps
   docker-prune/              # docker system prune (opt-in flags)
+  docker-container-exec/     # docker exec a command in a container
 docs/
   adding-a-playbook.md
   semaphore-setup.md

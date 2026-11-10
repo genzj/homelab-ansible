@@ -14,12 +14,12 @@ containers, unused networks, dangling images and build cache older than
 
 ## Variables
 
-| Name               | Required | Default        | Description |
-|--------------------|----------|----------------|-------------|
-| `target`           | no       | `docker_hosts` | Host pattern / inventory group |
-| `prune_all_images` | no       | `false`        | Remove all unused images, not only dangling ones (`--all`) |
-| `prune_volumes`    | no       | `false`        | Remove unused volumes (`--volumes`). **Data loss risk.** Disables the `until` filter (docker limitation) |
-| `prune_until`      | no       | `24h`          | Only prune objects older than this; `""` disables the filter |
+| Name               | Type           | Required | Default        | Description |
+|--------------------|----------------|----------|----------------|-------------|
+| `target`           | string         | no       | `docker_hosts` | Host pattern / inventory group |
+| `prune_all_images` | boolean        | no       | `false`        | Remove all unused images, not only dangling ones (`--all`) |
+| `prune_volumes`    | boolean        | no       | `false`        | Remove unused volumes (`--volumes`). **Data loss risk.** Disables the `until` filter (docker limitation) |
+| `prune_until`      | string         | no       | `24h`          | Only prune objects older than this; `""` disables the filter |
 
 No required variables. Example extra vars:
 

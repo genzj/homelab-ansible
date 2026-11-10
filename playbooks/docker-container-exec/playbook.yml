@@ -1,0 +1,111 @@
+---
+# docker-container-exec: run a command in a container with `docker exec`.
+#
+# Required : exec_container  container name or ID      (e.g. "web")
+#            exec_command    command to run             (e.g. "ls -la /data")
+# Optional : exec_interactive (false), exec_tty (false), exec_use_shell (false),
+#            exec_shell ("sh"), exec_user (""), exec_workdir (""), exec_env ({}),
+#            exec_changed (true)
+#
+# Check mode (--check) validates inputs and the container, then prints the
+# command without running it.
+# Uses `raw` only, so it works on hosts without Python (e.g. Flatcar).
+# Targets: docker_hosts. Use Semaphore Limit (or `target`) to pick the host
+# that runs the container.
+
+- name: Exec a command in a docker container
+  hosts: "{{ target | default('docker_hosts') }}"
+  gather_facts: false
+  become: false   # never escalate; `ansible` must be in the `docker` group
+
+  vars:
+    exec_interactive: false   # docker exec --interactive (keep STDIN open)
+    exec_tty: false           # docker exec --tty (allocate a pseudo-TTY)
+    exec_use_shell: false     # true = run a string command via `<exec_shell> -c`
+    exec_shell: sh            # shell inside the container
+    exec_user: ""             # docker exec --user, "" = image default
+    exec_workdir: ""          # docker exec --workdir, "" = image default
+    exec_env: {}              # extra env vars, mapping or JSON string
+    exec_changed: true        # report the task as "changed" (false for read-only commands)
+
+  tasks:
+    - name: Validate parameters
+      ansible.builtin.assert:
+        that:
+          - exec_container is defined
+          - exec_container | string | trim | length > 0
+          - exec_command is defined
+          - exec_command | length > 0
+          - exec_command is string or exec_command is sequence
+          - not (exec_use_shell | bool) or (exec_shell | string | trim | length > 0)
+        fail_msg: >-
+          exec_container and exec_command are required.
+          Example: {"exec_container": "web", "exec_command": "ls -la /data"}
+        quiet: true
+
+    - name: Normalize parameters
+      ansible.builtin.set_fact:
+        exec_env_map: >-
+          {{ exec_env if exec_env is mapping
+             else (exec_env | from_json if exec_env | string | trim | length > 0 else {}) }}
+        exec_cmd_list: >-
+          {{ (exec_command | map('string') | list) if exec_command is not string
+             else ([exec_shell, '-c', exec_command] if exec_use_shell | bool
+             else exec_command.split()) }}
+
+    - name: Validate exec_env
+      ansible.builtin.assert:
+        that: exec_env_map is mapping
+        fail_msg: 'exec_env must be a mapping, e.g. {"FOO": "bar"}'
+        quiet: true
+
+    - name: Build docker exec command
+      ansible.builtin.set_fact:
+        exec_argv: >-
+          {{ ['docker', 'exec']
+             + (['--interactive'] if exec_interactive | bool else [])
+             + (['--tty'] if exec_tty | bool else [])
+             + (['--user', exec_user | string] if exec_user | string | length > 0 else [])
+             + (['--workdir', exec_workdir | string] if exec_workdir | string | length > 0 else [])
+             + (exec_env_map.items() | map('join', '=') | map('regex_replace', '^', '--env=') | list)
+             + [exec_container | string | trim]
+             + exec_cmd_list }}
+
+    - name: Check that the container is running
+      ansible.builtin.raw: >-
+        docker inspect --type container
+        --format '{% raw %}{{.Name}} {{.State.Status}}{% endraw %}'
+        {{ exec_container | string | trim | quote }}
+      register: exec_inspect
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: Assert the container is running
+      ansible.builtin.assert:
+        that:
+          - exec_inspect.rc == 0
+          - (exec_inspect.stdout | trim).split(' ') | last == 'running'
+        fail_msg: >-
+          Container '{{ exec_container }}' not found or not running on {{ inventory_hostname }}:
+          {{ exec_inspect.stdout | trim }}
+        quiet: true
+
+    - name: Show command
+      ansible.builtin.debug:
+        msg: "{{ 'Would run' if ansible_check_mode else 'Running' }}: {{ exec_argv | map('quote') | join(' ') }}"
+
+    - name: Docker exec
+      ansible.builtin.raw: "{{ exec_argv | map('quote') | join(' ') }}"
+      register: exec_out
+      when: not ansible_check_mode
+      changed_when: exec_changed | bool
+
+    - name: Show output
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          container: "{{ exec_container }}"
+          rc: "{{ exec_out.rc }}"
+          output: "{{ exec_out.stdout_lines }}"
+      when: not ansible_check_mode

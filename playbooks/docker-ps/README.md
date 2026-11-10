@@ -14,10 +14,10 @@ wiring up a new Semaphore inventory or SSH key.
 
 ## Variables
 
-| Name            | Required | Default        | Description                    |
-|-----------------|----------|----------------|--------------------------------|
-| `target`        | no       | `docker_hosts` | Host pattern / inventory group |
-| `docker_ps_all` | no       | `false`        | Include stopped containers     |
+| Name            | Type           | Required | Default        | Description                    |
+|-----------------|----------------|----------|----------------|--------------------------------|
+| `target`        | string         | no       | `docker_hosts` | Host pattern / inventory group |
+| `docker_ps_all` | boolean        | no       | `false`        | Include stopped containers     |
 
 No required variables. Example extra vars:
 
